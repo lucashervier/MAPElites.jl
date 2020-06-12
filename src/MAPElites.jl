@@ -1,5 +1,10 @@
 module MAPElites
 
-# Write your package code here.
+using Random
+using Cambrian
+
+include("mapelites_functions.jl")
+include("mapelites_struct.jl")
+include("populate_function.jl")
 
 end
