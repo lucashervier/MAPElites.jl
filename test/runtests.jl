@@ -1,6 +1,7 @@
 include("../src/MAPElites.jl")
 using Test
 import YAML
+using BlackBoxOptimizationBenchmarking
 
 
 function test_struct(map::MapElites)
@@ -24,6 +25,23 @@ function test_donotchange_struct(map1::MapElites,map2::MapElites)
     @test typeof(map1.performances) == typeof(map2.performances)
     @test size(map1.solutions) == size(map2.solutions)
     @test size(map1.performances) == size(map2.performances)
+end
+
+function map_ind_toyproblem(ind::Individual)
+    x = ind.genes[1]
+    y = ind.genes[2]
+    grid_mesh = 100
+
+    x_ind = Int(trunc(grid_mesh*x)) + 1
+    y_ind = Int(trunc(grid_mesh*y)) + 1
+    [x_ind,y_ind]
+end
+
+function rosenbrock(i::Individual)
+    x = i.genes
+    y = -(sum([(1.0 - x[i])^2 + 100.0 * (x[i+1] - x[i]^2)^2
+              for i in 1:(length(x)-1)]))
+    [y]
 end
 
 @testset "MAPElites.jl" begin
@@ -82,7 +100,7 @@ end
             map_el = MapElites(3,10)
             map_el_old = deepcopy(map_el)
             coordinate = [5,4,3]
-            solution = Individual([1,1,0],[15.0])
+            solution = Individual([1,1,0],[5.0])
             performance = [5.0]
             add_to_map(map_el,coordinate,solution,performance)
             # check if we do not alterate structure by adding information
@@ -144,12 +162,21 @@ end
             @test count_elt(map_el) == 3
             most_promising = select_most_promising(map_el)
             @test most_promising == ind2
+            @test most_promising.fitness == perf2
+            @test typeof(most_promising) <: Individual
+            ind4 = Individual([1,0,0],[20.0])
+            perf4 = [20.0]
+            coord4 = [3,2,2]
+            add_to_map(map_el,coord4,ind4,perf4)
+            most_promising = select_most_promising(map_el)
+            @test most_promising == ind4
+            @test most_promising.fitness == perf4
             @test typeof(most_promising) <: Individual
         end
     end
 
-    @testset "Populating function" begin
-        @testset "mapelites_step.jl" begin
+    @testset "populate_function.jl" begin
+        @testset "mapelites_step!" begin
             map_el = MapElites(2,20)
             cfg = YAML.load_file("cfg/mapelites.yaml")
             e = Cambrian.Evolution(Cambrian.FloatIndividual,cfg)
@@ -165,5 +192,46 @@ end
             new_best = sort(e.population)[end]
             @test new_best.fitness >= best.fitness
         end
+
+        @testset "mapelites_run!" begin
+            cfg = YAML.load_file("cfg/mapelites.yaml")
+            e = Cambrian.Evolution(Cambrian.FloatIndividual,cfg)
+            features_dim = e.cfg["features_dim"]
+            grid_mesh = e.cfg["grid_mesh"]
+            mapel = MapElites(features_dim,grid_mesh)
+            map_ind_to_b(ind::Individual) = [Random.rand(1:grid_mesh) for dim in 1:features_dim]
+            mapelites_run!(e,mapel,map_ind_to_b)
+            test_struct(mapel)
+            @test count_elt(mapel) > 0
+            @test length(e.population) == cfg["n_population"]
+            @test e.gen == cfg["n_gen"]
+            best = sort(e.population)[end]
+            best_map = select_most_promising(mapel)
+            @test best_map.fitness == best.fitness
+        end
+    end
+
+    @testset "toyproblem" begin
+        cfg = YAML.load_file("cfg/mapelites.yaml")
+        cfg["n_genes"] = 2
+        features_dim = 2
+        grid_mesh = 100
+        cfg["n_gen"] = 10
+        cfg["n_population"] = 1000
+        rast = BlackBoxOptimizationBenchmarking.F15
+        evaluate1(ind::Individual) = rosenbrock(ind)
+        e = Cambrian.Evolution(Cambrian.FloatIndividual,cfg)
+        mapel = MapElites(features_dim,grid_mesh)
+        mapelites_run!(e,mapel,map_ind_toyproblem;evaluate=evaluate1)
+        test_struct(mapel)
+        @test count_elt(mapel) > 0
+        @test length(e.population) == cfg["n_population"]
+        @test e.gen == cfg["n_gen"]
+        best = sort(e.population)[end]
+        best_map = select_most_promising(mapel)
+        @test best_map.fitness == best.fitness
+        # println(best_map)
+        # println(best)
+        # println(mapel.solutions)
     end
 end

@@ -1,3 +1,5 @@
+using Cambrian
+export MapElites
 struct SparseArray{T,N} <: AbstractArray{T,N}
           data::Dict{NTuple{N,Int}, T}
           dims::NTuple{N,Int}

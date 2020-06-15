@@ -1,8 +1,10 @@
+using Random
+
 function count_elt(map_el::MapElites)
     return length(collect(skipmissing(map_el.solutions)))
 end
 
-function add_to_map(map_el::MapElites,coordinates::Array{Int64},solution::Individual,performance::Array{Float64})
+function add_to_map(map_el::MapElites,coordinates,solution::Individual,performance::Array{Float64})
     if (!haskey(map_el.solutions.data,Tuple(coordinates)))
         map_el.solutions.data[Tuple(coordinates)] = solution
         map_el.performances.data[Tuple(coordinates)] = performance
